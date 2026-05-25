@@ -1,0 +1,15 @@
+name = "telecloud"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "public"
+
+[[kv_namespaces]]
+binding = "TC_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# 以下变量在 Cloudflare Pages 控制台的 Environment Variables 中设置，不要写在此文件
+# ADMIN_USERNAME = "admin"
+# ADMIN_PASSWORD = "yourpassword"
+# UPLOAD_PASSWORD = "yourpassword"
+# TG_BOT_TOKEN = "your_bot_token"
+# TG_CHANNEL_ID = "-100xxxxxxxxxx"

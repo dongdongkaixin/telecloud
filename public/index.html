@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TeleCloud — 文件管理</title>
+  <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+  <!-- 侧边栏 -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <span class="logo-icon">☁️</span>
+      <span class="logo-text">TeleCloud</span>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-title">文件夹</div>
+      <div id="folderList" class="folder-list">
+        <div class="folder-item active" data-id="root">
+          <span class="folder-icon">📁</span> 根目录
+        </div>
+      </div>
+      <button class="btn-new-folder" onclick="showNewFolderModal()">
+        <span>＋</span> 新建文件夹
+      </button>
+    </div>
+    <div class="sidebar-bottom">
+      <button class="btn-sidebar" onclick="window.location.href='/admin.html'" id="adminBtn" style="display:none">
+        ⚙️ 管理后台
+      </button>
+      <button class="btn-sidebar btn-logout" onclick="logout()">
+        🚪 退出登录
+      </button>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="main-content">
+    <!-- 顶部工具栏 -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <button class="btn-hamburger" onclick="toggleSidebar()">☰</button>
+        <h2 id="currentFolderName">根目录</h2>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-action" onclick="showUploadModal()">
+          ⬆️ 上传文件
+        </button>
+        <button class="btn-action" onclick="showRemoteUploadModal()">
+          🔗 远程上传
+        </button>
+        <button class="btn-action btn-danger" id="batchDeleteBtn" onclick="batchDelete()" style="display:none">
+          🗑️ 批量删除
+        </button>
+        <button class="btn-action" id="batchMoveBtn" onclick="showBatchMoveModal()" style="display:none">
+          📦 批量移动
+        </button>
+      </div>
+    </div>
+
+    <!-- 文件列表 -->
+    <div class="file-table-container">
+      <table class="file-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" /></th>
+            <th>文件名</th>
+            <th>大小</th>
+            <th>上传时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="fileList">
+          <tr class="loading-row">
+            <td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">
+              加载中...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 上传进度条 -->
+    <div id="uploadProgress" class="upload-progress" style="display:none">
+      <div class="progress-header">
+        <span id="progressTitle">上传中...</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <div class="progress-detail" id="progressDetail"></div>
+    </div>
+  </div>
+
+  <!-- 上传文件 Modal -->
+  <div id="uploadModal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeModal('uploadModal')"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>上传文件</h3>
+        <button onclick="closeModal('uploadModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="upload-drop-zone" id="dropZone">
+          <div class="drop-icon">📂</div>
+          <p>拖拽文件到此处，或</p>
+          <label class="btn-action" for="fileInput">选择文件</label>
+          <input type="file" id="fileInput" style="display:none" multiple onchange="handleFileSelect(this)" />
+          <p class="hint">单文件最大支持 10GB（自动分块处理）</p>
+        </div>
+        <div id="fileQueue" class="file-queue"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 远程上传 Modal -->
+  <div id="remoteUploadModal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeModal('remoteUploadModal')"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>远程上传</h3>
+        <button onclick="closeModal('remoteUploadModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="tab-bar">
+          <button class="tab active" onclick="switchTab('url')">🔗 URL 链接</button>
+          <button class="tab" onclick="switchTab('magnet')">🧲 磁力链接</button>
+          <button class="tab" onclick="switchTab('torrent')">📄 种子文件</button>
+        </div>
+
+        <!-- URL 上传 -->
+        <div id="tab-url" class="tab-content active">
+          <div class="form-group">
+            <label>文件链接 URL</label>
+            <input type="url" id="remoteUrl" placeholder="https://example.com/file.zip" />
+          </div>
+          <div class="form-group">
+            <label>保存文件名（可选）</label>
+            <input type="text" id="remoteFilename" placeholder="留空自动提取" />
+          </div>
+          <button class="btn-action" onclick="startRemoteUpload()">开始上传</button>
+        </div>
+
+        <!-- 磁力链接 -->
+        <div id="tab-magnet" class="tab-content" style="display:none">
+          <div class="form-group">
+            <label>磁力链接</label>
+            <textarea id="magnetLink" rows="4" placeholder="magnet:?xt=urn:btih:..."></textarea>
+          </div>
+          <p class="hint">
+            ⚠️ 注意：由于 Cloudflare 无服务器架构限制，完整 BT 下载需配合
+            Alist + qBittorrent 等外部工具。点击提交后将保存任务记录，
+            可通过 WebDAV 挂载后在本地下载工具中处理。
+          </p>
+          <button class="btn-action" onclick="startMagnetUpload()">提交磁力链接</button>
+        </div>
+
+        <!-- 种子文件 -->
+        <div id="tab-torrent" class="tab-content" style="display:none">
+          <div class="form-group">
+            <label>选择 .torrent 文件</label>
+            <input type="file" id="torrentFile" accept=".torrent" />
+          </div>
+          <button class="btn-action" onclick="startTorrentUpload()">上传种子文件</button>
+        </div>
+
+        <div id="remoteUploadStatus" class="status-msg" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 新建文件夹 Modal -->
+  <div id="newFolderModal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeModal('newFolderModal')"></div>
+    <div class="modal-box small">
+      <div class="modal-header">
+        <h3>新建文件夹</h3>
+        <button onclick="closeModal('newFolderModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>文件夹名称</label>
+          <input type="text" id="newFolderName" placeholder="输入文件夹名称" />
+        </div>
+        <button class="btn-action" onclick="createFolder()">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移动文件 Modal -->
+  <div id="moveModal" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="closeModal('moveModal')"></div>
+    <div class="modal-box small">
+      <div class="modal-header">
+        <h3>移动到文件夹</h3>
+        <button onclick="closeModal('moveModal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="moveFolderList" class="folder-select-list"></div>
+        <button class="btn-action" onclick="confirmMove()">确认移动</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>
